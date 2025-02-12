@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>シンプルシューティングゲーム</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      background-color: #ffffff;
+      display: block;
+      margin: 20px auto;
+      border: 1px solid #ccc;
+    }
+    /* ボタン配置：Aボタンの左上に↑、左下に↓ */
+    #buttonContainer {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      margin: 0 auto;
+    }
+    #upButton {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 40px;
+      height: 40px;
+    }
+    #aButton {
+      position: absolute;
+      top: 30px;
+      right: 0;
+      width: 40px;
+      height: 40px;
+    }
+    #downButton {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 40px;
+      height: 40px;
+    }
+    /* リスタートボタンはAボタンの4回改行後 */
+    #restartButton {
+      margin-top: 60px;
+      width: 100px;
+      height: 40px;
+    }
+    #scoreDisplay, #timerDisplay {
+      font-size: 20px;
+      margin: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- ゲーム描画用キャンバス -->
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <!-- コントロールボタン -->
+  <div id="buttonContainer">
+    <button id="upButton">↑</button>
+    <button id="aButton">A</button>
+    <button id="downButton">↓</button>
+  </div>
+  <br><br><br><br>
+  <button id="restartButton">Restart</button>
+  <div id="scoreDisplay">Score: 0</div>
+  <div id="timerDisplay">Time: 30.0</div>
+
+  <script>
+    // キャンバスとコンテキストの取得
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 砲台（左側固定）の設定
+    const cannon = {
+      x: 50,
+      y: canvas.height / 2
+    };
+    const cannonWidth = 20;
+    const cannonHeight = 20;
+    const barrelLength = 30; // 砲台の発射筒の長さ
+
+    // 発射する球の設定
+    let balls = [];
+    const ballRadius = 15;
+    const ballSpeed = 5; // 毎フレームの移動ピクセル数
+    let lastBallTime = 0;
+    const ballCooldown = 1000; // 1秒に1発
+    const maxBalls = 5;
+
+    // 敵の設定
+    let enemies = [];
+    const enemyRadius = 15;
+    const enemyNormalSpeed = 2; // 普通の敵
+    const enemySlowSpeed = 1;   // 遅い敵
+
+    // 敵スポーン設定（30秒で15体）
+    const totalEnemiesToSpawn = 15;
+    let enemiesSpawned = 0;
+    const enemySpawnInterval = 30000 / totalEnemiesToSpawn; // 約2000msごと
+    let lastEnemySpawnTime = 0;
+
+    // スコアとタイマー
+    let score = 0;
+    const gameTime = 30; // 秒
+    let timerStarted = false;
+    let startTime = null;
+    let gameOver = false;
+
+    // 砲台の描画（本体と右向きの固定発射筒）
+    function drawCannon() {
+      // 砲台本体
+      ctx.fillStyle = 'gray';
+      ctx.fillRect(cannon.x - cannonWidth/2, cannon.y - cannonHeight/2, cannonWidth, cannonHeight);
+      // 砲台の発射筒（右方向へ伸びる線）
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(cannon.x, cannon.y);
+      ctx.lineTo(cannon.x + barrelLength, cannon.y);
+      ctx.stroke();
+    }
+
+    // 発射された球の更新と描画
+    function updateBalls() {
+      for (let i = balls.length - 1; i >= 0; i--) {
+        let ball = balls[i];
+        ball.x += ballSpeed;
+        // 画面外（右側）に出たら削除
+        if (ball.x - ball.radius > canvas.width) {
+          balls.splice(i, 1);
+        } else {
+          ctx.beginPath();
+          ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+          ctx.fillStyle = 'blue';
+          ctx.fill();
+        }
+      }
+    }
+
+    // 敵の更新と描画
+    function updateEnemies() {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        enemy.y += enemy.speed;
+        // 画面下に出たら削除
+        if (enemy.y - enemy.radius > canvas.height) {
+          enemies.splice(i, 1);
+        } else {
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+          ctx.fillStyle = (enemy.type === 'normal') ? 'red' : 'green';
+          ctx.fill();
+        }
+      }
+    }
+
+    // 敵の生成：画面上部、x座標はキャンバス中央～右端の間
+    function spawnEnemy() {
+      const x = Math.random() * (canvas.width - canvas.width/2) + canvas.width/2;
+      const y = -enemyRadius; // 画面外上部から出現
+      // 50%ずつで普通（赤・速い）と遅い（緑・遅い）を割り当て
+      const type = (Math.random() < 0.5) ? 'normal' : 'slow';
+      const speed = (type === 'normal') ? enemyNormalSpeed : enemySlowSpeed;
+      enemies.push({ x, y, radius: enemyRadius, speed, type });
+    }
+
+    // 球と敵の衝突判定（円同士の衝突）
+    function checkCollisions() {
+      for (let i = balls.length - 1; i >= 0; i--) {
+        let ball = balls[i];
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          let enemy = enemies[j];
+          const dx = ball.x - enemy.x;
+          const dy = ball.y - enemy.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < ball.radius + enemy.radius) {
+            // 衝突したら球と敵を削除し、スコア加算
+            if (enemy.type === 'normal') {
+              score += 5;
+            } else {
+              score += 1;
+            }
+            balls.splice(i, 1);
+            enemies.splice(j, 1);
+            break;
+          }
+        }
+      }
+    }
+
+    // ゲームループ
+    function update(timestamp) {
+      // ゲームオーバーなら表示してループを止める
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'white';
+        ctx.font = '40px Arial';
+        ctx.fillText('Game Over', canvas.width/2 - 100, canvas.height/2);
+        return;
+      }
+
+      // タイマー開始済みなら残り時間を更新
+      if (timerStarted) {
+        const elapsed = (timestamp - startTime) / 1000;
+        const remaining = Math.max(gameTime - elapsed, 0);
+        document.getElementById('timerDisplay').textContent = 'Time: ' + remaining.toFixed(1);
+        if (remaining <= 0) {
+          gameOver = true;
+        }
+      }
+
+      // キャンバスをクリア
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawCannon();
+      updateBalls();
+
+      // 敵を定期的に生成（15体になるまで）
+      if (timestamp - lastEnemySpawnTime > enemySpawnInterval && enemiesSpawned < totalEnemiesToSpawn) {
+        spawnEnemy();
+        lastEnemySpawnTime = timestamp;
+        enemiesSpawned++;
+      }
+      updateEnemies();
+      checkCollisions();
+
+      document.getElementById('scoreDisplay').textContent = 'Score: ' + score;
+
+      requestAnimationFrame(update);
+    }
+
+    // Aボタン押下で球を発射（発射間隔と同時存在数を制限）
+    function fireBall() {
+      if (gameOver) return;
+      const now = Date.now();
+      if (now - lastBallTime < ballCooldown) return;
+      if (balls.length >= maxBalls) return;
+      // 球は砲台の発射筒の先端から発射
+      const ball = {
+        x: cannon.x + barrelLength,
+        y: cannon.y,
+        radius: ballRadius
+      };
+      balls.push(ball);
+      lastBallTime = now;
+      // 初回発射時にタイマー開始
+      if (!timerStarted) {
+        timerStarted = true;
+        startTime = performance.now();
+      }
+    }
+
+    // ↑, ↓ ボタンで砲台を20ピクセル移動
+    function moveCannon(direction) {
+      if (gameOver) return;
+      if (direction === 'up') {
+        cannon.y -= 20;
+        if (cannon.y < cannonHeight/2) cannon.y = cannonHeight/2;
+      } else if (direction === 'down') {
+        cannon.y += 20;
+        if (cannon.y > canvas.height - cannonHeight/2) cannon.y = canvas.height - cannonHeight/2;
+      }
+    }
+
+    // リスタート処理：すべての状態を初期化してループ再開
+    function resetGame() {
+      cannon.y = canvas.height / 2;
+      balls = [];
+      enemies = [];
+      score = 0;
+      timerStarted = false;
+      gameOver = false;
+      enemiesSpawned = 0;
+      lastBallTime = 0;
+      lastEnemySpawnTime = 0;
+      startTime = null;
+      document.getElementById('timerDisplay').textContent = 'Time: ' + gameTime.toFixed(1);
+      document.getElementById('scoreDisplay').textContent = 'Score: 0';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      requestAnimationFrame(update);
+    }
+
+    // 各ボタンにイベントリスナーを設定
+    document.getElementById('aButton').addEventListener('click', fireBall);
+    document.getElementById('upButton').addEventListener('click', () => moveCannon('up'));
+    document.getElementById('downButton').addEventListener('click', () => moveCannon('down'));
+    document.getElementById('restartButton').addEventListener('click', resetGame);
+
+    // ゲームループ開始
+    requestAnimationFrame(update);
+  </script>
+</body>
+</html>
