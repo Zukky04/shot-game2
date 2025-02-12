@@ -20,36 +20,40 @@
     /* ボタン配置：Aボタンの左上に↑、左下に↓ */
     #buttonContainer {
       position: relative;
-      width: 100px;
-      height: 100px;
+      width: 240px; /* 拡大後のサイズに合わせ調整 */
+      height: 240px;
       margin: 0 auto;
     }
     #upButton {
       position: absolute;
       top: 0;
       left: 0;
-      width: 40px;
-      height: 40px;
+      width: 120px;
+      height: 120px;
+      font-size: 24px;
     }
     #aButton {
       position: absolute;
-      top: 30px;
+      top: 60px;
       right: 0;
-      width: 40px;
-      height: 40px;
+      width: 120px;
+      height: 120px;
+      font-size: 24px;
     }
     #downButton {
       position: absolute;
       bottom: 0;
       left: 0;
-      width: 40px;
-      height: 40px;
+      width: 120px;
+      height: 120px;
+      font-size: 24px;
     }
-    /* リスタートボタンはAボタンの4回改行後 */
+    /* リスタートボタンはAボタンの4回改行した下にある */
     #restartButton {
       margin-top: 60px;
-      width: 100px;
-      height: 40px;
+      width: 300px;
+      height: 120px;
+      font-size: 24px;
     }
     #scoreDisplay, #timerDisplay {
       font-size: 20px;
@@ -76,22 +80,22 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // 砲台（左側固定）の設定
+    // 砲台（左側固定）の設定　→ 大きさ3倍に変更
     const cannon = {
       x: 50,
       y: canvas.height / 2
     };
-    const cannonWidth = 20;
-    const cannonHeight = 20;
-    const barrelLength = 30; // 砲台の発射筒の長さ
+    const cannonWidth = 60;   // 元20の3倍
+    const cannonHeight = 60;  // 元20の3倍
+    const barrelLength = 90;  // 元30の3倍
 
     // 発射する球の設定
     let balls = [];
     const ballRadius = 15;
     const ballSpeed = 5; // 毎フレームの移動ピクセル数
     let lastBallTime = 0;
-    const ballCooldown = 1000; // 1秒に1発
-    const maxBalls = 5;
+    const ballCooldown = 500; // 0.5秒に1発
+    // ※球の同時存在数制限は削除
 
     // 敵の設定
     let enemies = [];
@@ -236,12 +240,11 @@
       requestAnimationFrame(update);
     }
 
-    // Aボタン押下で球を発射（発射間隔と同時存在数を制限）
+    // Aボタン押下で球を発射（発射間隔のみ制限）
     function fireBall() {
       if (gameOver) return;
       const now = Date.now();
       if (now - lastBallTime < ballCooldown) return;
-      if (balls.length >= maxBalls) return;
       // 球は砲台の発射筒の先端から発射
       const ball = {
         x: cannon.x + barrelLength,
@@ -257,14 +260,14 @@
       }
     }
 
-    // ↑, ↓ ボタンで砲台を20ピクセル移動
+    // ↑, ↓ ボタンで砲台を60ピクセル移動
     function moveCannon(direction) {
       if (gameOver) return;
       if (direction === 'up') {
-        cannon.y -= 20;
+        cannon.y -= 60;
         if (cannon.y < cannonHeight/2) cannon.y = cannonHeight/2;
       } else if (direction === 'down') {
-        cannon.y += 20;
+        cannon.y += 60;
         if (cannon.y > canvas.height - cannonHeight/2) cannon.y = canvas.height - cannonHeight/2;
       }
     }
