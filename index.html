@@ -91,15 +91,15 @@
 
     // 発射する球の設定
     let balls = [];
-    const ballRadius = 25;
-    const ballSpeed = 8; // 毎フレームの移動ピクセル数
+    const ballRadius = 10;
+    const ballSpeed = 12; // 毎フレームの移動ピクセル数
     let lastBallTime = 0;
-    const ballCooldown = 500; // 0.5秒に1発
+    const ballCooldown = 200; // 0.5秒に1発
     // ※球の同時存在数制限は削除
 
     // 敵の設定
     let enemies = [];
-    const enemyRadius = 20;
+    const enemyRadius = 35;
     const enemyNormalSpeed = 2; // 普通の敵
     const enemySlowSpeed = 1;   // 遅い敵
 
@@ -123,7 +123,7 @@
       ctx.fillRect(cannon.x - cannonWidth/2, cannon.y - cannonHeight/2, cannonWidth, cannonHeight);
       // 砲台の発射筒（右方向へ伸びる線）
       ctx.strokeStyle = 'black';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 8;
       ctx.beginPath();
       ctx.moveTo(cannon.x, cannon.y);
       ctx.lineTo(cannon.x + barrelLength, cannon.y);
